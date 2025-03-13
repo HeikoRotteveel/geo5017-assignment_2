@@ -43,9 +43,6 @@ class urban_object:
         self.feature = []
 
     def compute_features(self):
-        """
-        Compute the features, here we provide two example features. You're encouraged to design your own features
-        """
         # calculate the height
         height = np.amax(self.points[:, 2])
         self.feature.append(height)
@@ -74,22 +71,29 @@ class urban_object:
         shape_index = 1.0 * hull_area / hull_perimeter
         self.feature.append(shape_index)
 
-        # obtain the point cluster near the top area
-        k_top = max(int(len(self.points) * 0.005), 100)
+        # obtain the point cluster near the top area todo: play with other values?
+        k_top = max(int(len(self.points) * 0.015), 100)
         idx = kd_tree_3d.query(top, k=k_top, return_distance=False)
         idx = np.squeeze(idx, axis=0)
         neighbours = self.points[idx, :]
 
         # obtain the covariance matrix of the top points
-        cov = np.cov(neighbours.T)
-        w, _ = np.linalg.eig(cov)
-        w.sort()
+        cov_top = np.cov(neighbours.T)
+        w_top, _ = np.linalg.eig(cov_top)
+        w_top.sort()
 
-        # calculate the linearity and sphericity
-        linearity = (w[2]-w[1]) / (w[2] + 1e-5)
-        sphericity = w[0] / (w[2] + 1e-5)
-        self.feature += [linearity, sphericity]
+        # calculate the linearity, planarity, sphericity, omnivariance, anisotropy, and change of curvature
+        # 0-3, 2-1, 1-2
+        linearity_top = (w_top[2]-w_top[1]) / (w_top[2] + 1e-5)
+        planarity_top = (w_top[1] - w_top[0]) / (w_top[2] + 1e-5)
+        sphericity_top = w_top[0] / (w_top[2] + 1e-5)
+        omnivariance_top = pow((w_top[2] * w_top[1] * w_top[0]), float(1.0 / 3.0))
+        anisotropy_top = (w_top[2] - w_top[0]) / (w_top[2] + 1e-5)
+        change_of_curvature_top = (w_top[0] / (w_top[2] + w_top[1] + w_top[0] + 1e-5))
+        self.feature += [linearity_top, planarity_top, sphericity_top, omnivariance_top, anisotropy_top, change_of_curvature_top]
 
+        # add the number of points in the point cloud
+        self.feature.append(len(self.points))
 
 def read_xyz(filenm):
     """
@@ -141,7 +145,7 @@ def feature_preparation(data_path):
     outputs = np.array(input_data).astype(np.float32)
 
     # write the output to a local file
-    data_header = 'ID,label,height,root_density,area,shape_index,linearity,sphericity'
+    data_header = 'ID,label,height,root_density,area,shape_index,linearity_top,planarity_top,sphericity_top,omnivariance_top,anisotropy_top,change_of_curvature_top,num_points'
     np.savetxt(data_file, outputs, fmt='%10.5f', delimiter=',', newline='\n', header=data_header)
 
 
@@ -177,14 +181,14 @@ def feature_visualization(X):
 
     # plot the data with first two features
     for i in range(5):
-        ax.scatter(X[100*i:100*(i+1), 3], X[100*i:100*(i+1), 4], marker="o", c=colors[i], edgecolor="k", label=labels[i])
+        ax.scatter(X[100*i:100*(i+1), 5], X[100*i:100*(i+1), 7], marker="o", c=colors[i], edgecolor="k", label=labels[i])
 
     # show the figure with labels
     """
     Replace the axis labels with your own feature names
     """
-    ax.set_xlabel('x1:root density')
-    ax.set_ylabel('x2:area')
+    ax.set_xlabel('x1:planarity')
+    ax.set_ylabel('x2:omnivariance')
     ax.legend()
     plt.show()
 
