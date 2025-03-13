@@ -63,12 +63,12 @@ class urban_object:
 
         # compute the 2D footprint and calculate its area
         hull_2d = ConvexHull(self.points[:, :2])
-        hull_area = hull_2d.volume
-        self.feature.append(hull_area)
+        hull_area_2d = hull_2d.volume
+        self.feature.append(hull_area_2d)
 
         # get the hull shape index
         hull_perimeter = hull_2d.area
-        shape_index = 1.0 * hull_area / hull_perimeter
+        shape_index = 1.0 * hull_area_2d / hull_perimeter
         self.feature.append(shape_index)
 
         # obtain the point cluster near the top area todo: play with other values?
@@ -94,6 +94,21 @@ class urban_object:
 
         # add the number of points in the point cloud
         self.feature.append(len(self.points))
+
+        # estimate 3d volume
+        hull_3d = ConvexHull(self.points)
+        hull_volume_3d = hull_3d.volume
+        self.feature.append(hull_volume_3d)
+
+        # calculate average height
+        avg_height = np.average(self.points[:, 2])
+        self.feature.append(avg_height)
+
+        # calculate height, x, and y standard deviation
+        std_x = np.std(self.points[:, 0])
+        std_y = np.std(self.points[:, 1])
+        std_height = np.std(self.points[:, 2])
+        self.feature += [std_x, std_y, std_height]
 
 def read_xyz(filenm):
     """
@@ -145,7 +160,9 @@ def feature_preparation(data_path):
     outputs = np.array(input_data).astype(np.float32)
 
     # write the output to a local file
-    data_header = 'ID,label,height,root_density,area,shape_index,linearity_top,planarity_top,sphericity_top,omnivariance_top,anisotropy_top,change_of_curvature_top,num_points'
+    data_header = ('ID,label,height,root_density,hull_area_2d,shape_index,linearity_top,planarity_top,'
+                   'sphericity_top,omnivariance_top,anisotropy_top,change_of_curvature_top,num_points,'
+                   'hull_volume_3d, avg_height, std_x, std_y, std_height')
     np.savetxt(data_file, outputs, fmt='%10.5f', delimiter=',', newline='\n', header=data_header)
 
 
@@ -170,27 +187,42 @@ def feature_visualization(X):
     Visualize the features
         X: input features. This assumes classes are stored in a sequential manner
     """
-    # initialize a plot
-    fig = plt.figure()
-    ax = fig.add_subplot()
-    plt.title("feature subset visualization of 5 classes", fontsize="small")
-
     # define the labels and corresponding colors
     colors = ['firebrick', 'grey', 'darkorange', 'dodgerblue', 'olivedrab']
     labels = ['building', 'car', 'fence', 'pole', 'tree']
+    features = ['height','root_density','hull_area_2d','shape_index','linearity_top','planarity_top',
+                   'sphericity_top','omnivariance_top','anisotropy_top','change_of_curvature_top','num_points',
+                   'hull_volume_3d', 'avg_height', 'std_x', 'std_y', 'std_height']
 
-    # plot the data with first two features
-    for i in range(5):
-        ax.scatter(X[100*i:100*(i+1), 5], X[100*i:100*(i+1), 7], marker="o", c=colors[i], edgecolor="k", label=labels[i])
+    while True:
+        print(f"\nPlease select a feature to visualize by pressing the corresponding number key (0 - {len(X[0]) - 1})")
+        print("Otherwise, press -1 to continue")
+        try:
+            choice = int(input("Enter your choice: "))
+            if choice < -1 or choice > len(X[0]) - 1:
+                print("Invalid choice. Please select a valid option.\n")
+                continue
+            if choice == -1:
+                print("Exiting visualization.")
+                break
+            else:
+                # initialize a plot
+                fig = plt.figure()
+                ax = fig.add_subplot()
+                plt.title("feature subset visualization of 5 classes", fontsize="small")
 
-    # show the figure with labels
-    """
-    Replace the axis labels with your own feature names
-    """
-    ax.set_xlabel('x1:planarity')
-    ax.set_ylabel('x2:omnivariance')
-    ax.legend()
-    plt.show()
+                for i in range(5):
+                    ax.scatter(X[100 * i:100 * (i + 1), choice], (X[100 * i:100 * (i + 1), 0] * 0 + i), marker="o",
+                               c=colors[i],
+                               edgecolor="k", label=labels[i])
+
+                ax.set_ylabel('x1:label')
+                ax.set_xlabel(f'x2:feature {features[choice]}')
+                ax.legend()
+                plt.show()
+
+        except ValueError:
+            print("Invalid input. Please enter a number corresponding to an option.\n")
 
 
 def SVM_classification(X, y):
