@@ -84,13 +84,19 @@ class urban_object:
 
         # calculate the linearity, planarity, sphericity, omnivariance, anisotropy, and change of curvature
         # 0-3, 2-1, 1-2
+        sum_of_eigenvalues = np.sum(w_top)
         linearity_top = (w_top[2]-w_top[1]) / (w_top[2] + 1e-5)
         planarity_top = (w_top[1] - w_top[0]) / (w_top[2] + 1e-5)
         sphericity_top = w_top[0] / (w_top[2] + 1e-5)
         omnivariance_top = pow((w_top[2] * w_top[1] * w_top[0]), float(1.0 / 3.0))
         anisotropy_top = (w_top[2] - w_top[0]) / (w_top[2] + 1e-5)
-        change_of_curvature_top = (w_top[0] / (w_top[2] + w_top[1] + w_top[0] + 1e-5))
-        self.feature += [linearity_top, planarity_top, sphericity_top, omnivariance_top, anisotropy_top, change_of_curvature_top]
+        change_of_curvature_top = (w_top[0] / sum_of_eigenvalues)
+        eigenotropy = 0
+        for eigenvalue in w_top:
+            eigenotropy += eigenvalue * math.log(eigenvalue)
+        eigenotropy *= -1
+
+        self.feature += [sum_of_eigenvalues, linearity_top, planarity_top, sphericity_top, omnivariance_top, anisotropy_top, change_of_curvature_top, eigenotropy]
 
         # add the number of points in the point cloud
         self.feature.append(len(self.points))
@@ -160,8 +166,8 @@ def feature_preparation(data_path):
     outputs = np.array(input_data).astype(np.float32)
 
     # write the output to a local file
-    data_header = ('ID,label,height,root_density,hull_area_2d,shape_index,linearity_top,planarity_top,'
-                   'sphericity_top,omnivariance_top,anisotropy_top,change_of_curvature_top,num_points,'
+    data_header = ('ID,label,height,root_density,hull_area_2d,shape_index,sum_of_eigenvalues,linearity_top,planarity_top,'
+                   'sphericity_top,omnivariance_top,anisotropy_top,change_of_curvature_top,eigenotropy,num_points,'
                    'hull_volume_3d, avg_height, std_x, std_y, std_height')
     np.savetxt(data_file, outputs, fmt='%10.5f', delimiter=',', newline='\n', header=data_header)
 
@@ -190,8 +196,8 @@ def feature_visualization(X):
     # define the labels and corresponding colors
     colors = ['firebrick', 'grey', 'darkorange', 'dodgerblue', 'olivedrab']
     labels = ['building', 'car', 'fence', 'pole', 'tree']
-    features = ['height','root_density','hull_area_2d','shape_index','linearity_top','planarity_top',
-                   'sphericity_top','omnivariance_top','anisotropy_top','change_of_curvature_top','num_points',
+    features = ['height','root_density','hull_area_2d','shape_index','sum_of_eigenvalues','linearity_top','planarity_top',
+                   'sphericity_top','omnivariance_top','anisotropy_top','change_of_curvature_top','eigenotropy','num_points',
                    'hull_volume_3d', 'avg_height', 'std_x', 'std_y', 'std_height']
 
     while True:
