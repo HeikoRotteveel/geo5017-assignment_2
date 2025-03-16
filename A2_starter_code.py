@@ -7,16 +7,17 @@ Required libraries: numpy, scipy, scikit learn, matplotlib, tqdm
 """
 
 import math
+from os import listdir
+from os.path import exists, join
+
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.neighbors import KDTree
-from sklearn import svm
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, confusion_matrix
 from scipy.spatial import ConvexHull
+from sklearn import svm
+from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KDTree
 from tqdm import tqdm
-from os.path import exists, join
-from os import listdir
 
 
 class urban_object:
@@ -49,11 +50,11 @@ class urban_object:
 
         # get the root point and top point
         root = self.points[[np.argmin(self.points[:, 2])]]
-        top = self.points[[np.argmax(self.points[:, 2])]]
+        # top = self.points[[np.argmax(self.points[:, 2])]]
 
         # construct the 2D and 3D kd tree
         kd_tree_2d = KDTree(self.points[:, :2], leaf_size=5)
-        kd_tree_3d = KDTree(self.points, leaf_size=5)
+        # kd_tree_3d = KDTree(self.points, leaf_size=5)
 
         # compute the root point planar density
         radius_root = 0.2
@@ -71,32 +72,26 @@ class urban_object:
         shape_index = 1.0 * hull_area_2d / hull_perimeter
         self.feature.append(shape_index)
 
-        # obtain the point cluster near the top area todo: play with other values?
-        k_top = max(int(len(self.points) * 0.015), 100)
-        idx = kd_tree_3d.query(top, k=k_top, return_distance=False)
-        idx = np.squeeze(idx, axis=0)
-        neighbours = self.points[idx, :]
+        # obtain the covariance matrix and eigenvalues
+        cov = np.cov(self.points.T)
+        w, _ = np.linalg.eig(cov)
+        w.sort()
 
-        # obtain the covariance matrix of the top points
-        cov_top = np.cov(neighbours.T)
-        w_top, _ = np.linalg.eig(cov_top)
-        w_top.sort()
-
-        # calculate the linearity, planarity, sphericity, omnivariance, anisotropy, and change of curvature
+        # calculate the metrics described in "Contour detection in unstructured 3D point clouds"
         # 0-3, 2-1, 1-2
-        sum_of_eigenvalues = np.sum(w_top)
-        linearity_top = (w_top[2]-w_top[1]) / (w_top[2] + 1e-5)
-        planarity_top = (w_top[1] - w_top[0]) / (w_top[2] + 1e-5)
-        sphericity_top = w_top[0] / (w_top[2] + 1e-5)
-        omnivariance_top = pow((w_top[2] * w_top[1] * w_top[0]), float(1.0 / 3.0))
-        anisotropy_top = (w_top[2] - w_top[0]) / (w_top[2] + 1e-5)
-        change_of_curvature_top = (w_top[0] / sum_of_eigenvalues)
-        eigenotropy = 0
-        for eigenvalue in w_top:
-            eigenotropy += eigenvalue * math.log(eigenvalue)
-        eigenotropy *= -1
+        sum_of_eigenvalues = np.sum(w)
+        linearity = (w[2]-w[1]) / (w[2] + 1e-5)
+        planarity = (w[1] - w[0]) / (w[2] + 1e-5)
+        sphericity = w[0] / (w[2] + 1e-5)
+        omnivariance = pow((w[2] * w[1] * w[0]), float(1.0 / 3.0))
+        anisotropy = (w[2] - w[0]) / (w[2] + 1e-5)
+        change_of_curvature = (w[0] / sum_of_eigenvalues)
+        eigenetropy = 0
+        for eigenvalue in w:
+            eigenetropy += eigenvalue * math.log(eigenvalue)
+        eigenetropy *= -1
 
-        self.feature += [sum_of_eigenvalues, linearity_top, planarity_top, sphericity_top, omnivariance_top, anisotropy_top, change_of_curvature_top, eigenotropy]
+        self.feature += [sum_of_eigenvalues, linearity, planarity, sphericity, omnivariance, anisotropy, change_of_curvature, eigenetropy]
 
         # add the number of points in the point cloud
         self.feature.append(len(self.points))
@@ -114,7 +109,7 @@ class urban_object:
         std_x = np.std(self.points[:, 0])
         std_y = np.std(self.points[:, 1])
         std_height = np.std(self.points[:, 2])
-        self.feature += [std_x, std_y, std_height]
+        self.feature += [std_x + std_y, std_height]
 
 def read_xyz(filenm):
     """
@@ -166,9 +161,9 @@ def feature_preparation(data_path):
     outputs = np.array(input_data).astype(np.float32)
 
     # write the output to a local file
-    data_header = ('ID,label,height,root_density,hull_area_2d,shape_index,sum_of_eigenvalues,linearity_top,planarity_top,'
-                   'sphericity_top,omnivariance_top,anisotropy_top,change_of_curvature_top,eigenotropy,num_points,'
-                   'hull_volume_3d, avg_height, std_x, std_y, std_height')
+    data_header = ('ID,label,height,root_density,hull_area_2d,shape_index,sum_of_eigenvalues,linearity,planarity,'
+                   'sphericity,omnivariance,anisotropy,change_of_curvature,eigenetropy,num_points,'
+                   'hull_volume_3d, avg_height, std_x_y, std_height')
     np.savetxt(data_file, outputs, fmt='%10.5f', delimiter=',', newline='\n', header=data_header)
 
 
@@ -187,6 +182,17 @@ def data_loading(data_file='data.txt'):
 
     return ID, X, y
 
+def feature_selection(X):
+    refined_X = np.copy(X)
+
+    #Todo: implement within class scatter matrix
+
+    #Todo: implement between class scatter matrix
+
+    #Todo use forward search for feature selection
+
+    return refined_X
+
 
 def feature_visualization(X):
     """
@@ -196,9 +202,9 @@ def feature_visualization(X):
     # define the labels and corresponding colors
     colors = ['firebrick', 'grey', 'darkorange', 'dodgerblue', 'olivedrab']
     labels = ['building', 'car', 'fence', 'pole', 'tree']
-    features = ['height','root_density','hull_area_2d','shape_index','sum_of_eigenvalues','linearity_top','planarity_top',
-                   'sphericity_top','omnivariance_top','anisotropy_top','change_of_curvature_top','eigenotropy','num_points',
-                   'hull_volume_3d', 'avg_height', 'std_x', 'std_y', 'std_height']
+    features = ['height','root_density','hull_area_2d','shape_index','sum_of_eigenvalues','linearity','planarity',
+                   'sphericity','omnivariance','anisotropy','change_of_curvature','eigenetropy','num_points',
+                   'hull_volume_3d', 'avg_height', 'std_x_y', 'std_height']
 
     while True:
         print(f"\nPlease select a feature to visualize by pressing the corresponding number key (0 - {len(X[0]) - 1})")
@@ -274,10 +280,14 @@ if __name__=='__main__':
     print('Visualize the features')
     feature_visualization(X=X)
 
+    # conduct feature selection
+    print('Start selection features')
+    refined_X = feature_selection(X)
+
     # SVM classification
     print('Start SVM classification')
-    SVM_classification(X, y)
+    SVM_classification(refined_X, y)
 
     # RF classification
     print('Start RF classification')
-    RF_classification(X, y)
+    RF_classification(refined_X, y)
