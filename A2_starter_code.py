@@ -197,23 +197,26 @@ def feature_selection(X):
             sb = 0
             # Calculate within and between class scatter matrix
             for i in range(5):
-                i_th_features = feature[100 * i:100 * (i + 1)]
+                class_features = feature[100 * i:100 * (i + 1)]
                 if len(feature_set) == 0:
                     # Todo: is this correct? How to calculate values when just one feature is being analysed
-                    # Within class (np.cov(np.array([i_th_features, i_th_features]).T)???) Just 100x100 0's
-                    cov = np.cov([i_th_features, i_th_features])
+                    # Within class
+                    # (np.cov(np.array([class_features, class_features]).T)???) Just 100x100 0's, divide by 0 error
+                    cov = np.cov([class_features, class_features])
                     sw += (N_N_k * cov)
                     # Between class
-                    sample_means = np.array([i_th_features])
+                    # Just the sample values?
+                    sample_means = np.array([class_features])
                     sb += (N_N_k * ((sample_means * total_mean) * (sample_means * total_mean).T))
                 else:
                     # Within class
                     current_features = np.array(feature_set)[:,100 * i:100 * (i + 1)]
                     # Todo: Transpose?? 100x100 or 2x2
-                    cov = np.cov(np.append(current_features, [i_th_features], axis=0))
+                    cov = np.cov(np.append(current_features, [class_features], axis=0))
                     sw += (N_N_k * cov)
                     # Between class
-                    sample_means = np.array([np.mean(np.append(current_features, [i_th_features], axis=0), axis=0)])
+                    # Todo: correct axis??
+                    sample_means = np.array([np.mean(np.append(current_features, [class_features], axis=0), axis=0)])
                     sb += (N_N_k * ((sample_means * total_mean) * (sample_means * total_mean).T))
 
             feature_J_val.append(np.trace(sb) / np.trace(sw))
