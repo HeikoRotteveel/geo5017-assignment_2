@@ -183,15 +183,52 @@ def data_loading(data_file='data.txt'):
     return ID, X, y
 
 def feature_selection(X):
-    refined_X = np.copy(X)
+    features = np.copy(X).T
+    feature_set = []
+    N_N_k = float(1/5)
 
-    #Todo: implement within class scatter matrix
+    # Perform forward search for feature selection
+    while len(feature_set) < 4:
+        feature_J_val = []
 
-    #Todo: implement between class scatter matrix
+        for feature in features:
+            total_mean = np.mean(feature)
+            sw = 0
+            sb = 0
+            # Calculate within and between class scatter matrix
+            for i in range(5):
+                i_th_features = feature[100 * i:100 * (i + 1)]
+                if len(feature_set) == 0:
+                    # Todo: is this correct? How to calculate values when just one feature is being analysed
+                    # Within class (np.cov(np.array([i_th_features, i_th_features]).T)???) Just 100x100 0's
+                    cov = np.cov([i_th_features, i_th_features])
+                    sw += (N_N_k * cov)
+                    # Between class
+                    sample_means = np.array([i_th_features])
+                    sb += (N_N_k * ((sample_means * total_mean) * (sample_means * total_mean).T))
+                else:
+                    # Within class
+                    current_features = np.array(feature_set)[:,100 * i:100 * (i + 1)]
+                    # Todo: Transpose?? 100x100 or 2x2
+                    cov = np.cov(np.append(current_features, [i_th_features], axis=0))
+                    sw += (N_N_k * cov)
+                    # Between class
+                    sample_means = np.array([np.mean(np.append(current_features, [i_th_features], axis=0), axis=0)])
+                    sb += (N_N_k * ((sample_means * total_mean) * (sample_means * total_mean).T))
 
-    #Todo use forward search for feature selection
+            feature_J_val.append(np.trace(sb) / np.trace(sw))
 
-    return refined_X
+        # Sort features based on best J value
+        ind = np.argsort(feature_J_val)
+        features = features[ind]
+        # Select best feature and add to feature set
+        best_feature = features[-1]
+        features = np.delete(features, len(features) - 1, axis=0)
+        feature_set.append(best_feature)
+
+    # Return feature set
+    feature_set = np.array(feature_set).T
+    return feature_set
 
 
 def feature_visualization(X):
