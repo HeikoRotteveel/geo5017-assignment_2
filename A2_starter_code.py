@@ -301,6 +301,90 @@ def SVM_classification(X, y):
     print(conf)
 
 
+def plot_learning_curve(training_samples, accuracies, type):
+    plt.figure(figsize=(8, 6))
+
+    # Scatter plot of actual points
+    plt.plot(training_samples, accuracies, marker='o', linestyle='-', color='b', label='Accuracy')
+
+    # Fit a quadratic polynomial trendline
+    coefficients = np.polyfit(training_samples, accuracies, 2)  # Quadratic fit
+    poly_func = np.poly1d(coefficients)
+
+    # Generate smooth trendline values
+    sample_range = np.linspace(min(training_samples), max(training_samples), 100)
+    trendline_y = poly_func(sample_range)
+
+    # Plot the trendline
+    plt.plot(sample_range, trendline_y, linestyle="--", color="r", label="Trendline")
+
+    # Compute residuals and estimate confidence interval
+    predicted_y = poly_func(training_samples)
+    residuals = accuracies - predicted_y
+    std_dev = np.std(residuals)  # Standard deviation of residuals
+
+    # Compute confidence interval bounds
+    z_score = 1.96  # Approx. for 95% confidence
+    margin = z_score * std_dev  # Confidence margin
+    lower_bound = trendline_y - margin
+    upper_bound = trendline_y + margin
+
+    # Plot confidence interval
+    plt.fill_between(sample_range, lower_bound, upper_bound, color='r', alpha=0.2, label="95% Confidence Interval")
+
+    # Find the maximum of the fitted curve (vertex of the parabola)
+    a, b, c = coefficients  # Quadratic equation: ax^2 + bx + c
+    max_sample_size = -b / (2 * a)  # Vertex formula: x = -b / (2a)
+    max_accuracy = poly_func(max_sample_size)  # Compute corresponding accuracy
+
+    print(f"Maximum Fitted Accuracy: {max_accuracy:.4f} at {max_sample_size:.2f} training samples")
+
+    plt.xlabel("Number of Training Samples")
+    plt.ylabel("Accuracy")
+    plt.title(f"{type} Learning Curve with Confidence Interval")
+    plt.ylim(0, 1)  # Accuracy is between 0 and 1
+    plt.grid(True)
+    plt.legend()
+
+    plt.show()
+
+def learning_curve(X,y, steps, type='SVM'):
+    floatlist = np.linspace(0.01, 0.99, steps)
+    acc_list = []
+    num_samp_train = []
+
+    if type == "SVM":
+        for i in floatlist:
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=float(i))
+            clf = svm.SVC()
+            clf.fit(X_train, y_train)
+            y_preds = clf.predict(X_test)
+            acc = accuracy_score(y_test, y_preds)
+            acc_list.append(acc)
+            num_samp_train.append(len(X_train))
+            print("SVM: Train-test split ratio", 1-i*10, ":", i*10, "gives an accuracy of", acc)
+
+    if type == "RF":
+        for i in floatlist:
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=float(i))
+            clf = RandomForestClassifier(max_features='log2')
+            clf.fit(X_train, y_train)
+            y_preds = clf.predict(X_test)
+            acc = accuracy_score(y_test, y_preds)
+            acc = accuracy_score(y_test, y_preds)
+            acc_list.append(acc)
+            num_samp_train.append(len(X_train))
+            print("RF: Train-test split ratio", 1 - i * 10, ":", i * 10, "gives an accuracy of", acc)
+
+
+
+
+    plot_learning_curve(num_samp_train, acc_list, type)
+
+
+
+
+
 def RF_classification(X, y):
     """
     Conduct RF classification
@@ -342,6 +426,9 @@ if __name__=='__main__':
     # SVM classification
     print('Start SVM classification')
     SVM_classification(X=refined_X, y=y)
+
+    # SVM learning curve
+    learning_curve(refined_X,y,100, type="RF")
 
     # RF classification
     print('Start RF classification')
