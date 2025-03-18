@@ -192,42 +192,41 @@ def feature_selection(X):
         feature_J_val = []
 
         for feature in features:
-            total_mean = np.mean(feature)
             sw = 0
             sb = 0
             # Calculate within and between class scatter matrix
             for i in range(5):
                 class_features = feature[100 * i:100 * (i + 1)]
                 if len(feature_set) == 0:
-                    # Todo: is this correct? How to calculate values when just one feature is being analysed
                     # Within class
-                    # (np.cov(np.array([class_features, class_features]).T)???) Just 100x100 0's, divide by 0 error
-                    cov = np.cov([class_features, class_features])
+                    cov = np.cov(class_features)
                     sw += (N_N_k * cov)
                     # Between class
-                    # Just the sample values?
-                    sample_means = np.array([class_features])
-                    sb += (N_N_k * ((sample_means * total_mean) * (sample_means * total_mean).T))
+                    sample_mean = np.mean([class_features])
+                    total_mean = np.mean(feature)
+                    sb += (N_N_k * ((sample_mean * total_mean) * (sample_mean * total_mean).T))
                 else:
                     # Within class
                     current_features = np.array(feature_set)[:,100 * i:100 * (i + 1)]
-                    # Todo: Transpose?? 100x100 or 2x2
                     cov = np.cov(np.append(current_features, [class_features], axis=0))
                     sw += (N_N_k * cov)
                     # Between class
-                    # Todo: correct axis??
-                    sample_means = np.array([np.mean(np.append(current_features, [class_features], axis=0), axis=0)])
-                    sb += (N_N_k * ((sample_means * total_mean) * (sample_means * total_mean).T))
+                    sample_means = np.array([np.mean(np.append(current_features, [class_features], axis=0), axis=1)])
+                    total_means = np.array([np.mean(np.append(feature_set, [feature], axis=0), axis=1)])
+                    sb += (N_N_k * ((sample_means * total_means) * (sample_means * total_means).T))
 
-            feature_J_val.append(np.trace(sb) / np.trace(sw))
-
+            if len(feature_set) == 0:
+                # sb and sw will be floats
+                feature_J_val.append(sb / sw)
+            else:
+                feature_J_val.append(np.trace(sb) / np.trace(sw))
         # Sort features based on best J value
         ind = np.argsort(feature_J_val)
         features = features[ind]
         # Select best feature and add to feature set
         best_feature = features[-1]
-        features = np.delete(features, len(features) - 1, axis=0)
         feature_set.append(best_feature)
+        features = np.delete(features, len(features) - 1, axis=0)
 
     # Return feature set
     feature_set = np.array(feature_set).T
@@ -322,12 +321,12 @@ if __name__=='__main__':
 
     # conduct feature selection
     print('Start selection features')
-    refined_X = feature_selection(X)
+    refined_X = feature_selection(X=X)
 
     # SVM classification
     print('Start SVM classification')
-    SVM_classification(refined_X, y)
+    SVM_classification(X=refined_X, y=y)
 
     # RF classification
     print('Start RF classification')
-    RF_classification(refined_X, y)
+    RF_classification(X=refined_X, y=y)
