@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial import ConvexHull
 from sklearn import svm
+from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.model_selection import train_test_split
@@ -185,10 +186,12 @@ def data_loading(data_file='data.txt'):
     return ID, X, y
 
 def feature_selection(X):
-    # Normalize
+    # Normalize and perform PCA to shrink feature space
     x = StandardScaler().fit_transform(X)  # normalizing the features
+    pca = PCA(n_components=8)
+    principal_components = pca.fit_transform(x)
 
-    features = np.copy(x).T
+    features = np.copy(principal_components).T
     feature_set = []
     N_N_k = float(1/5)
 
@@ -288,7 +291,7 @@ def SVM_classification(X, y):
         y: labels
     """
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4)
-    clf = svm.SVC()
+    clf = svm.SVC(kernel='rbf', C=10)
     clf.fit(X_train, y_train)
     y_preds = clf.predict(X_test)
     acc = accuracy_score(y_test, y_preds)
