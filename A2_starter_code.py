@@ -14,9 +14,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial import ConvexHull
 from sklearn import svm
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KDTree
+from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
 
@@ -183,7 +185,10 @@ def data_loading(data_file='data.txt'):
     return ID, X, y
 
 def feature_selection(X):
-    features = np.copy(X).T
+    # Normalize
+    x = StandardScaler().fit_transform(X)  # normalizing the features
+
+    features = np.copy(x).T
     feature_set = []
     N_N_k = float(1/5)
 
@@ -299,7 +304,15 @@ def RF_classification(X, y):
         X: features
         y: labels
     """
-    pass
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4)
+    clf = RandomForestClassifier(max_features='log2')
+    clf.fit(X_train, y_train)
+    y_preds = clf.predict(X_test)
+    acc = accuracy_score(y_test, y_preds)
+    print("RF accuracy: %5.2f" % acc)
+    print("confusion matrix")
+    conf = confusion_matrix(y_test, y_preds)
+    print(conf)
 
 
 if __name__=='__main__':
