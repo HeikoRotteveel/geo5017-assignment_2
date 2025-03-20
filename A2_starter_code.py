@@ -16,10 +16,9 @@ from scipy.spatial import ConvexHull
 from sklearn import svm
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KDTree
-from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
 
@@ -27,6 +26,7 @@ class urban_object:
     """
     Define an urban object
     """
+
     def __init__(self, filenm):
         """
         Initialize the object
@@ -38,7 +38,7 @@ class urban_object:
         self.cloud_ID = int(self.cloud_name)
 
         # obtain the label
-        self.label = math.floor(1.0*self.cloud_ID/100)
+        self.label = math.floor(1.0 * self.cloud_ID / 100)
 
         # obtain the points
         self.points = read_xyz(filenm)
@@ -62,7 +62,7 @@ class urban_object:
         # compute the root point planar density
         radius_root = 0.2
         count = kd_tree_2d.query_radius(root[:, :2], r=radius_root, count_only=True)
-        root_density = 1.0*count[0] / len(self.points)
+        root_density = 1.0 * count[0] / len(self.points)
         self.feature.append(root_density)
 
         # compute the 2D footprint and calculate its area
@@ -83,7 +83,7 @@ class urban_object:
         # calculate the metrics described in "Contour detection in unstructured 3D point clouds"
         # 0-3, 2-1, 1-2
         sum_of_eigenvalues = np.sum(w)
-        linearity = (w[2]-w[1]) / (w[2] + 1e-5)
+        linearity = (w[2] - w[1]) / (w[2] + 1e-5)
         planarity = (w[1] - w[0]) / (w[2] + 1e-5)
         sphericity = w[0] / (w[2] + 1e-5)
         omnivariance = pow((w[2] * w[1] * w[0]), float(1.0 / 3.0))
@@ -94,7 +94,8 @@ class urban_object:
             eigenetropy += eigenvalue * math.log(eigenvalue)
         eigenetropy *= -1
 
-        self.feature += [sum_of_eigenvalues, linearity, planarity, sphericity, omnivariance, anisotropy, change_of_curvature, eigenetropy]
+        self.feature += [sum_of_eigenvalues, linearity, planarity, sphericity, omnivariance, anisotropy,
+                         change_of_curvature, eigenetropy]
 
         # add the number of points in the point cloud
         self.feature.append(len(self.points))
@@ -113,6 +114,7 @@ class urban_object:
         std_y = np.std(self.points[:, 1])
         std_height = np.std(self.points[:, 2])
         self.feature += [std_x + std_y, std_height]
+
 
 def read_xyz(filenm):
     """
@@ -185,18 +187,26 @@ def data_loading(data_file='data.txt'):
 
     return ID, X, y
 
+
+def normalize_features(X):
+    normalized = np.copy(X).T
+    for i, feature_vector in enumerate(X.T):
+        mean = np.mean(feature_vector)
+        std = np.std(feature_vector)
+        normalized_feature_vector = (feature_vector - mean) / std
+        normalized[i] = normalized_feature_vector
+    return normalized.T
+
+
 def feature_selection(X):
-    # Normalize and perform PCA to shrink feature space
-    x = StandardScaler().fit_transform(X)  # normalizing the features
-    pca = PCA(n_components=8)
-    principal_components = pca.fit_transform(x)
-
-    features = np.copy(principal_components).T
+    # Normalize features
+    normalized = normalize_features(X)
+    features = np.copy(normalized).T
     feature_set = []
-    N_N_k = float(1/5)
+    N_N_k = float(1 / 5)
 
-    # Perform forward search for feature selection
-    while len(feature_set) < 4:
+    # Perform forward search to pick top 50% of features
+    while len(feature_set) < max(len(features) / 2, 4):
         feature_J_val = []
 
         for feature in features:
@@ -215,7 +225,7 @@ def feature_selection(X):
                     sb += (N_N_k * ((sample_mean * total_mean) * (sample_mean * total_mean).T))
                 else:
                     # Within class
-                    current_features = np.array(feature_set)[:,100 * i:100 * (i + 1)]
+                    current_features = np.array(feature_set)[:, 100 * i:100 * (i + 1)]
                     cov = np.cov(np.append(current_features, [class_features], axis=0))
                     sw += (N_N_k * cov)
                     # Between class
@@ -236,9 +246,11 @@ def feature_selection(X):
         feature_set.append(best_feature)
         features = np.delete(features, len(features) - 1, axis=0)
 
+    # Perform PCA on selected features to reduce dimensions to 4
+    pca = PCA(n_components=4)
+    principal_components = pca.fit_transform(np.array(feature_set).T)
     # Return feature set
-    feature_set = np.array(feature_set).T
-    return feature_set
+    return principal_components
 
 
 def feature_visualization(X):
@@ -249,9 +261,9 @@ def feature_visualization(X):
     # define the labels and corresponding colors
     colors = ['firebrick', 'grey', 'darkorange', 'dodgerblue', 'olivedrab']
     labels = ['building', 'car', 'fence', 'pole', 'tree']
-    features = ['height','root_density','hull_area_2d','shape_index','sum_of_eigenvalues','linearity','planarity',
-                   'sphericity','omnivariance','anisotropy','change_of_curvature','eigenetropy','num_points',
-                   'hull_volume_3d', 'avg_height', 'std_x_y', 'std_height']
+    features = ['height', 'root_density', 'hull_area_2d', 'shape_index', 'sum_of_eigenvalues', 'linearity', 'planarity',
+                'sphericity', 'omnivariance', 'anisotropy', 'change_of_curvature', 'eigenetropy', 'num_points',
+                'hull_volume_3d', 'avg_height', 'std_x_y', 'std_height']
 
     while True:
         print(f"\nPlease select a feature to visualize by pressing the corresponding number key (0 - {len(X[0]) - 1})")
@@ -294,9 +306,37 @@ def SVM_classification(X, y):
     clf = svm.SVC(kernel='rbf', C=10)
     clf.fit(X_train, y_train)
     y_preds = clf.predict(X_test)
+
+    print_metrics(y_preds, y_test, "SVM")
+
+
+def RF_classification(X, y):
+    """
+    Conduct RF classification
+        X: features
+        y: labels
+    """
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4)
+    clf = RandomForestClassifier(max_features='log2')
+    clf.fit(X_train, y_train)
+    y_preds = clf.predict(X_test)
+
+    print_metrics(y_preds, y_test, "RF")
+
+
+def print_metrics(y_preds, y_test, classifier_label):
     acc = accuracy_score(y_test, y_preds)
-    print("SVM accuracy: %5.2f" % acc)
-    print("confusion matrix")
+    f1 = f1_score(y_test, y_preds, average=None)
+    precision = precision_score(y_test, y_preds, average=None)
+    recall = recall_score(y_test, y_preds, average=None)
+
+    print(classifier_label, "overall accuracy: %5.2f" % acc)
+
+    print("Class labels: 'building', 'car', 'fence', 'pole', 'tree'")
+    print(classifier_label, "f1:", f1)
+    print(classifier_label, "precision:", precision)
+    print(classifier_label, "recall:", recall)
+    print(classifier_label, "confusion matrix")
     conf = confusion_matrix(y_test, y_preds)
     print(conf)
 
@@ -348,7 +388,8 @@ def plot_learning_curve(training_samples, accuracies, type):
 
     plt.show()
 
-def learning_curve(X,y, steps, type='SVM'):
+
+def learning_curve(X, y, steps, type='SVM'):
     floatlist = np.linspace(0.01, 0.99, steps)
     acc_list = []
     num_samp_train = []
@@ -362,7 +403,7 @@ def learning_curve(X,y, steps, type='SVM'):
             acc = accuracy_score(y_test, y_preds)
             acc_list.append(acc)
             num_samp_train.append(len(X_train))
-            print("SVM: Train-test split ratio", 1-i*10, ":", i*10, "gives an accuracy of", acc)
+            print("SVM: Train-test split ratio", 1 - i * 10, ":", i * 10, "gives an accuracy of", acc)
 
     if type == "RF":
         for i in floatlist:
@@ -376,33 +417,10 @@ def learning_curve(X,y, steps, type='SVM'):
             num_samp_train.append(len(X_train))
             print("RF: Train-test split ratio", 1 - i * 10, ":", i * 10, "gives an accuracy of", acc)
 
-
-
-
     plot_learning_curve(num_samp_train, acc_list, type)
 
 
-
-
-
-def RF_classification(X, y):
-    """
-    Conduct RF classification
-        X: features
-        y: labels
-    """
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4)
-    clf = RandomForestClassifier(max_features='log2')
-    clf.fit(X_train, y_train)
-    y_preds = clf.predict(X_test)
-    acc = accuracy_score(y_test, y_preds)
-    print("RF accuracy: %5.2f" % acc)
-    print("confusion matrix")
-    conf = confusion_matrix(y_test, y_preds)
-    print(conf)
-
-
-if __name__=='__main__':
+if __name__ == '__main__':
     # specify the data folder
     """"Here you need to specify your own path"""
     path = 'pointclouds-500'
@@ -424,12 +442,15 @@ if __name__=='__main__':
     refined_X = feature_selection(X=X)
 
     # SVM classification
-    print('Start SVM classification')
+    print('\nStart SVM classification')
     SVM_classification(X=refined_X, y=y)
 
     # SVM learning curve
-    learning_curve(refined_X,y,100, type="RF")
+    # learning_curve(refined_X, y, 100)
 
     # RF classification
-    print('Start RF classification')
+    print('\nStart RF classification')
     RF_classification(X=refined_X, y=y)
+
+    # RF learning curve
+    # learning_curve(refined_X, y, 100, type="RF")
