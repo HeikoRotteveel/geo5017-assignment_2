@@ -296,28 +296,33 @@ def feature_visualization(X):
             print("Invalid input. Please enter a number corresponding to an option.\n")
 
 
-def SVM_classification(X, y):
+def SVM_classification(X, y, hyperparameters):
     """
     Conduct SVM classification
         X: features
         y: labels
     """
+
+    C, kernel, degree, gamma, decision_function_shape = hyperparameters
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4)
-    clf = svm.SVC(kernel='rbf', C=10)
+    clf = svm.SVC(C=C, kernel=kernel, degree=degree, gamma=gamma, decision_function_shape=decision_function_shape)
     clf.fit(X_train, y_train)
     y_preds = clf.predict(X_test)
 
     print_metrics(y_preds, y_test, "SVM")
 
 
-def RF_classification(X, y):
+def RF_classification(X, y, hyperparameters):
     """
     Conduct RF classification
         X: features
         y: labels
     """
+    n_estimators, criterion, max_features, bootstrap, max_samples = hyperparameters
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4)
-    clf = RandomForestClassifier(max_features='log2')
+    clf = RandomForestClassifier(n_estimators=n_estimators, criterion=criterion, max_features=max_features,
+                                 bootstrap=bootstrap, max_samples=max_samples)
     clf.fit(X_train, y_train)
     y_preds = clf.predict(X_test)
 
@@ -420,6 +425,109 @@ def learning_curve(X, y, steps, type='SVM'):
     plot_learning_curve(num_samp_train, acc_list, type)
 
 
+def generate_SMV_hyperparameters(X, y):
+    """
+    Conduct SVM hyperparameter tuning
+        X: features
+        y: labels
+    """
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33)
+
+    Cs = [0.1, 1, 5, 10, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 750, 1000]
+    kernels = ['linear', 'poly', 'rbf', 'sigmoid']
+    degrees = [1, 2, 3, 4, 5, 6]
+    gammas = ['scale', 'auto', 0.001, 0.005, 0.01, 0.05, 0.1, 0.5]
+    decision_function_shapes = ['ovr', 'ovo']
+
+    best_accuracy = 0
+    best_C = None
+    best_kernel = None
+    best_degree = None
+    best_gamma = None
+    best_decision_function_shape = None
+
+    for C in tqdm(Cs, total=len(Cs)):
+        for kernel in kernels:
+            for degree in degrees:
+                for gamma in gammas:
+                    for decision_function_shape in decision_function_shapes:
+                        clf = svm.SVC(C=C, kernel=kernel, degree=degree, gamma=gamma,
+                                      decision_function_shape=decision_function_shape)
+                        clf.fit(X_train, y_train)
+                        y_preds = clf.predict(X_test)
+
+                        acc = accuracy_score(y_test, y_preds)
+                        if acc > best_accuracy:
+                            best_accuracy = acc
+                            best_C = C
+                            best_kernel = kernel
+                            best_degree = degree
+                            best_gamma = gamma
+                            best_decision_function_shape = decision_function_shape
+
+    print("Best Hyperparameters [C, kernel, degree, gamma, decision_function_shape]:", best_C, best_kernel, best_degree,
+          best_gamma, best_decision_function_shape)
+    print("Best Accuracy:", best_accuracy)
+
+    return best_C, best_kernel, best_degree, best_gamma, best_decision_function_shape
+
+
+def generate_RF_hyperparameters(X, y):
+    """
+    Conduct RF hyperparameter tuning
+        X: features
+        y: labels
+    """
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33)
+
+    n_estimators = [25, 50, 75, 100, 125, 150, 200, 250, 300]
+    crirerions = ['gini', 'entropy', 'log_loss']
+    max_features = ["sqrt", "log2", 1, 2, 3, 4]
+    bootstraps = [True, False]
+    max_samples = [None, 0.01, 0.1, 0.25, 0.5, 0.75, 0.9]
+
+    best_accuracy = 0
+    best_n_estimators = None
+    best_criterion = None
+    best_max_features = None
+    best_bootstrap = None
+    best_max_samples = None
+
+    for n_estimator in tqdm(n_estimators, total=len(n_estimators)):
+        for criterion in crirerions:
+            for max_feature in max_features:
+                for bootstrap in bootstraps:
+                    for max_sample in max_samples:
+                        if not bootstrap:
+                            # If not bootstrapping, ensure max_sample is none
+                            max_sample = None
+
+                        clf = RandomForestClassifier(n_estimators=n_estimator, criterion=criterion,
+                                                     max_features=max_feature, bootstrap=bootstrap,
+                                                     max_samples=max_sample)
+                        clf.fit(X_train, y_train)
+                        y_preds = clf.predict(X_test)
+
+                        acc = accuracy_score(y_test, y_preds)
+                        if acc > best_accuracy:
+                            best_accuracy = acc
+                            best_n_estimators = n_estimator
+                            best_criterion = criterion
+                            best_max_features = max_feature
+                            best_bootstrap = bootstrap
+                            best_max_samples = max_sample
+
+                        if not bootstrap:
+                            # If not bootstrapping, do not have to redo calculation for each potential value
+                            break
+
+    print("Best Hyperparameters [n_estimator, criterion, max_feature, bootstrap, max_sample]:", best_n_estimators,
+          best_criterion, best_max_features, best_bootstrap, best_max_samples)
+    print("Best Accuracy:", best_accuracy)
+
+    return best_n_estimators, best_criterion, best_max_features, best_bootstrap, best_max_samples
+
+
 if __name__ == '__main__':
     # specify the data folder
     """"Here you need to specify your own path"""
@@ -442,15 +550,21 @@ if __name__ == '__main__':
     refined_X = feature_selection(X=X)
 
     # SVM classification
+    print('\nStart SVM hyperparameter tuning')
+    h = generate_SMV_hyperparameters(X=refined_X, y=y)
+
     print('\nStart SVM classification')
-    SVM_classification(X=refined_X, y=y)
+    SVM_classification(X=refined_X, y=y, hyperparameters=h)
 
     # SVM learning curve
     # learning_curve(refined_X, y, 100)
 
     # RF classification
+    print('\nStart RF hyperparameter tuning')
+    h = generate_RF_hyperparameters(X=refined_X, y=y)
+
     print('\nStart RF classification')
-    RF_classification(X=refined_X, y=y)
+    RF_classification(X=refined_X, y=y, hyperparameters=h)
 
     # RF learning curve
     # learning_curve(refined_X, y, 100, type="RF")
