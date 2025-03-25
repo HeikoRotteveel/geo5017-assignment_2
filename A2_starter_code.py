@@ -346,86 +346,99 @@ def print_metrics(y_preds, y_test, classifier_label):
     print(conf)
 
 
-def plot_learning_curve(training_samples, accuracies, type):
+def plot_learning_curve(num_samp_train, mean_train_error_list, mean_test_error_list,
+                        std_train_error_list, std_test_error_list, model_type, runs):
     plt.figure(figsize=(8, 6))
 
-    # Scatter plot of actual points
-    plt.plot(training_samples, accuracies, marker='o', linestyle='-', color='b', label='Accuracy')
+    # Compute Confidence Intervals (95% CI)
+    ci_train = 1.96 * (np.array(std_train_error_list) / np.sqrt(runs))
+    ci_test = 1.96 * (np.array(std_test_error_list) / np.sqrt(runs))
 
-    # Fit a quadratic polynomial trendline
-    coefficients = np.polyfit(training_samples, accuracies, 2)  # Quadratic fit
-    poly_func = np.poly1d(coefficients)
+    # Plot mean error rates
+    plt.plot(num_samp_train, mean_train_error_list, marker='o', linestyle='-', color='g', label='Apparent error')
+    plt.plot(num_samp_train, mean_test_error_list, marker='o', linestyle='-', color='b', label='True error')
 
-    # Generate smooth trendline values
-    sample_range = np.linspace(min(training_samples), max(training_samples), 100)
-    trendline_y = poly_func(sample_range)
+    # Fill between for confidence intervals
+    plt.fill_between(num_samp_train,
+                     np.array(mean_train_error_list) - ci_train,
+                     np.array(mean_train_error_list) + ci_train,
+                     color='g', alpha=0.2)
 
-    # Plot the trendline
-    plt.plot(sample_range, trendline_y, linestyle="--", color="r", label="Trendline")
+    plt.fill_between(num_samp_train,
+                     np.array(mean_test_error_list) - ci_test,
+                     np.array(mean_test_error_list) + ci_test,
+                     color='b', alpha=0.2)
 
-    # Compute residuals and estimate confidence interval
-    predicted_y = poly_func(training_samples)
-    residuals = accuracies - predicted_y
-    std_dev = np.std(residuals)  # Standard deviation of residuals
-
-    # Compute confidence interval bounds
-    z_score = 1.96  # Approx. for 95% confidence
-    margin = z_score * std_dev  # Confidence margin
-    lower_bound = trendline_y - margin
-    upper_bound = trendline_y + margin
-
-    # Plot confidence interval
-    plt.fill_between(sample_range, lower_bound, upper_bound, color='r', alpha=0.2, label="95% Confidence Interval")
-
-    # Find the maximum of the fitted curve (vertex of the parabola)
-    a, b, c = coefficients  # Quadratic equation: ax^2 + bx + c
-    max_sample_size = -b / (2 * a)  # Vertex formula: x = -b / (2a)
-    max_accuracy = poly_func(max_sample_size)  # Compute corresponding accuracy
-
-    print(f"Maximum Fitted Accuracy: {max_accuracy:.4f} at {max_sample_size:.2f} training samples")
-
-    plt.xlabel("Number of Training Samples")
-    plt.ylabel("Accuracy")
-    plt.title(f"{type} Learning Curve with Confidence Interval")
-    plt.ylim(0, 1)  # Accuracy is between 0 and 1
+    plt.xlabel("Number of training samples",fontsize=12)
+    plt.ylabel("Classification error",fontsize=12)
+    plt.title(f"{model_type} Learning curve (mean of {runs} runs)",fontsize=15, weight='bold')
+    plt.ylim(0, 1)
     plt.grid(True)
     plt.legend()
-
     plt.show()
 
 
-def learning_curve(X, y, steps, type='SVM'):
-    floatlist = np.linspace(0.01, 0.99, steps)
-    acc_list = []
+def learning_curve(X, y, steps, h, model_type='SVM', runs=100):
+    floatlist = np.linspace(0.01, 0.99, steps)  # Ensure values stay between 0 and 1
+    mean_train_error_list = []  # Store Apparent Error Rate (AER)
+    mean_test_error_list = []   # Store True Error Rate (TER)
+    std_train_error_list = []
+    std_test_error_list = []
     num_samp_train = []
 
-    if type == "SVM":
-        for i in floatlist:
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=float(i))
-            clf = svm.SVC()
+    for i in floatlist:
+        train_errors = []
+        test_errors = []
+
+        for _ in range(runs):
+            X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=i)  # Only specify train_size
+
+            if len(X_train) < 5 or len(X_test) < 5:  # Ensure enough samples
+                continue
+
+            if model_type == "SVM":
+                clf = svm.SVC(**h)
+            elif model_type == "RF":
+                clf = RandomForestClassifier(**h)
+            else:
+                raise ValueError("Unknown model type")
+
             clf.fit(X_train, y_train)
-            y_preds = clf.predict(X_test)
-            acc = accuracy_score(y_test, y_preds)
-            acc_list.append(acc)
-            num_samp_train.append(len(X_train))
-            print("SVM: Train-test split ratio", 1 - i * 10, ":", i * 10, "gives an accuracy of", acc)
 
-    if type == "RF":
-        for i in floatlist:
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=float(i))
-            clf = RandomForestClassifier(max_features='log2')
-            clf.fit(X_train, y_train)
-            y_preds = clf.predict(X_test)
-            acc = accuracy_score(y_test, y_preds)
-            acc = accuracy_score(y_test, y_preds)
-            acc_list.append(acc)
-            num_samp_train.append(len(X_train))
-            print("RF: Train-test split ratio", 1 - i * 10, ":", i * 10, "gives an accuracy of", acc)
+            # Compute training and test errors
+            train_acc = accuracy_score(y_train, clf.predict(X_train))
+            test_acc = accuracy_score(y_test, clf.predict(X_test))
 
-    plot_learning_curve(num_samp_train, acc_list, type)
+            train_errors.append(1 - train_acc)  # Apparent Error Rate (AER)
+            test_errors.append(1 - test_acc)    # True Error Rate (TER)
+
+        if len(train_errors) == 0:  # Avoid division by zero
+            continue
+
+        # Compute mean error rates over multiple runs
+        mean_train_error = np.mean(train_errors)
+        mean_test_error = np.mean(test_errors)
+
+        mean_train_error_list.append(mean_train_error)
+        mean_test_error_list.append(mean_test_error)
+
+        # Compute standard deviations over multiple runs
+        std_train_error = np.std(train_errors)
+        std_test_error = np.std(test_errors)
+
+        std_train_error_list.append(std_train_error)
+        std_test_error_list.append(std_test_error)
+
+        num_samp_train.append(len(X_train))
+
+        print(f"{model_type}: Train-Test split {i:.2f}:{1 - i:.2f} → "
+              f"AER: {mean_train_error:.4f}, TER: {mean_test_error:.4f}")
+
+    plot_learning_curve(num_samp_train, mean_train_error_list, mean_test_error_list,
+                        std_train_error_list, std_test_error_list, model_type, runs)
 
 
-def generate_SMV_hyperparameters(X, y):
+def generate_SVM_hyperparameters(X, y):
     """
     Conduct SVM hyperparameter tuning
         X: features
@@ -469,7 +482,15 @@ def generate_SMV_hyperparameters(X, y):
           best_gamma, best_decision_function_shape)
     print("Best Accuracy:", best_accuracy)
 
-    return best_C, best_kernel, best_degree, best_gamma, best_decision_function_shape
+    hyperparameters = {
+        'C': best_C,
+        'kernel': best_kernel,
+        'degree': best_degree,
+        'gamma': best_gamma,
+        'decision_function_shape': best_decision_function_shape
+    }
+
+    return hyperparameters
 
 
 def generate_RF_hyperparameters(X, y):
@@ -525,7 +546,15 @@ def generate_RF_hyperparameters(X, y):
           best_criterion, best_max_features, best_bootstrap, best_max_samples)
     print("Best Accuracy:", best_accuracy)
 
-    return best_n_estimators, best_criterion, best_max_features, best_bootstrap, best_max_samples
+    hyperparameters = {
+        'n_estimators': best_n_estimators,
+        'criterion': best_criterion,
+        'max_features': best_max_features,
+        'bootstrap': best_bootstrap,
+        'max_samples': best_max_samples
+    }
+
+    return hyperparameters
 
 
 if __name__ == '__main__':
@@ -551,20 +580,17 @@ if __name__ == '__main__':
 
     # SVM classification
     print('\nStart SVM hyperparameter tuning')
-    h = generate_SMV_hyperparameters(X=refined_X, y=y)
+    h = generate_SVM_hyperparameters(X=refined_X, y=y)
 
-    print('\nStart SVM classification')
-    SVM_classification(X=refined_X, y=y, hyperparameters=h)
-
-    # SVM learning curve
-    # learning_curve(refined_X, y, 100)
+    #print('\nStart SVM classification')
+    #SVM_classification(X=refined_X, y=y, hyperparameters=h)
 
     # RF classification
-    print('\nStart RF hyperparameter tuning')
-    h = generate_RF_hyperparameters(X=refined_X, y=y)
+    #print('\nStart RF hyperparameter tuning')
+    #h = generate_RF_hyperparameters(X=refined_X, y=y)
 
-    print('\nStart RF classification')
-    RF_classification(X=refined_X, y=y, hyperparameters=h)
+    #print('\nStart RF classification')
+    #RF_classification(X=refined_X, y=y, hyperparameters=h)
 
     # RF learning curve
-    # learning_curve(refined_X, y, 100, type="RF")
+    learning_curve(refined_X, y, 100, h, model_type="SVM", runs=50)
