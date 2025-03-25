@@ -330,18 +330,18 @@ def RF_classification(X, y, hyperparameters):
 
 
 def print_metrics(y_preds, y_test, classifier_label):
-    acc = accuracy_score(y_test, y_preds)
-    f1 = f1_score(y_test, y_preds, average=None)
-    precision = precision_score(y_test, y_preds, average=None)
-    recall = recall_score(y_test, y_preds, average=None)
-
-    print(classifier_label, "overall accuracy: %5.2f" % acc)
 
     print("Class labels: 'building', 'car', 'fence', 'pole', 'tree'")
-    print(classifier_label, "f1:", f1)
-    print(classifier_label, "precision:", precision)
-    print(classifier_label, "recall:", recall)
-    print(classifier_label, "confusion matrix")
+    print(classifier_label, "f1:", f1_score(y_test, y_preds, average=None))
+    print(classifier_label, "precision:", precision_score(y_test, y_preds, average=None))
+    print(classifier_label, "recall:", recall_score(y_test, y_preds, average=None))
+
+    print("\n", classifier_label, "overall accuracy: %5.2f" % accuracy_score(y_test, y_preds))
+    print(classifier_label, "f1 (weighted):", f1_score(y_test, y_preds, average='weighted'))
+    print(classifier_label, "precision (weighted):", precision_score(y_test, y_preds, average='weighted'))
+    print(classifier_label, "recall (weighted):", recall_score(y_test, y_preds, average='weighted'))
+
+    print("\n", classifier_label, "confusion matrix")
     conf = confusion_matrix(y_test, y_preds)
     print(conf)
 
@@ -452,7 +452,7 @@ def generate_SVM_hyperparameters(X, y):
     gammas = ['scale', 'auto', 0.001, 0.005, 0.01, 0.05, 0.1, 0.5]
     decision_function_shapes = ['ovr', 'ovo']
 
-    best_accuracy = 0
+    best_score = 0
     best_C = None
     best_kernel = None
     best_degree = None
@@ -469,9 +469,9 @@ def generate_SVM_hyperparameters(X, y):
                         clf.fit(X_train, y_train)
                         y_preds = clf.predict(X_test)
 
-                        acc = accuracy_score(y_test, y_preds)
-                        if acc > best_accuracy:
-                            best_accuracy = acc
+                        score = f1_score(y_test, y_preds, average='weighted')
+                        if score > best_score:
+                            best_score = score
                             best_C = C
                             best_kernel = kernel
                             best_degree = degree
@@ -480,7 +480,7 @@ def generate_SVM_hyperparameters(X, y):
 
     print("Best Hyperparameters [C, kernel, degree, gamma, decision_function_shape]:", best_C, best_kernel, best_degree,
           best_gamma, best_decision_function_shape)
-    print("Best Accuracy:", best_accuracy)
+    print("Best F1 (weighted):", best_score)
 
     hyperparameters = {
         'C': best_C,
@@ -507,7 +507,7 @@ def generate_RF_hyperparameters(X, y):
     bootstraps = [True, False]
     max_samples = [None, 0.01, 0.1, 0.25, 0.5, 0.75, 0.9]
 
-    best_accuracy = 0
+    best_score = 0
     best_n_estimators = None
     best_criterion = None
     best_max_features = None
@@ -529,9 +529,9 @@ def generate_RF_hyperparameters(X, y):
                         clf.fit(X_train, y_train)
                         y_preds = clf.predict(X_test)
 
-                        acc = accuracy_score(y_test, y_preds)
-                        if acc > best_accuracy:
-                            best_accuracy = acc
+                        score = f1_score(y_test, y_preds, average='weighted')
+                        if score > best_score:
+                            best_score = score
                             best_n_estimators = n_estimator
                             best_criterion = criterion
                             best_max_features = max_feature
@@ -544,7 +544,7 @@ def generate_RF_hyperparameters(X, y):
 
     print("Best Hyperparameters [n_estimator, criterion, max_feature, bootstrap, max_sample]:", best_n_estimators,
           best_criterion, best_max_features, best_bootstrap, best_max_samples)
-    print("Best Accuracy:", best_accuracy)
+    print("Best F1 (weighted):", best_score)
 
     hyperparameters = {
         'n_estimators': best_n_estimators,
