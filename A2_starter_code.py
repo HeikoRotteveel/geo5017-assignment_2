@@ -579,18 +579,18 @@ if __name__ == '__main__':
     refined_X = feature_selection(X=X)
 
     # SVM classification
-    print('\nStart SVM hyperparameter tuning')
-    h = generate_SVM_hyperparameters(X=refined_X, y=y)
+    #print('\nStart SVM hyperparameter tuning')
+    #h = generate_SVM_hyperparameters(X=refined_X, y=y)
 
     #print('\nStart SVM classification')
     #SVM_classification(X=refined_X, y=y, hyperparameters=h)
 
     # RF classification
-    #print('\nStart RF hyperparameter tuning')
-    #h = generate_RF_hyperparameters(X=refined_X, y=y)
+    print('\nStart RF hyperparameter tuning')
+    h = generate_RF_hyperparameters(X=refined_X, y=y)
 
     #print('\nStart RF classification')
     #RF_classification(X=refined_X, y=y, hyperparameters=h)
 
-    # RF learning curve
-    learning_curve(refined_X, y, 100, h, model_type="SVM", runs=50)
+    # Learning curve
+    learning_curve(refined_X, y, 100, h, model_type="RF", runs=50)
