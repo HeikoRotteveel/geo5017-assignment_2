@@ -302,10 +302,8 @@ def SVM_classification(X, y, hyperparameters):
         X: features
         y: labels
     """
-
-    C, kernel, degree, gamma, decision_function_shape = hyperparameters
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4)
-    clf = svm.SVC(C=C, kernel=kernel, degree=degree, gamma=gamma, decision_function_shape=decision_function_shape)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25)
+    clf = svm.SVC(**hyperparameters)
     clf.fit(X_train, y_train)
     y_preds = clf.predict(X_test)
 
@@ -318,11 +316,8 @@ def RF_classification(X, y, hyperparameters):
         X: features
         y: labels
     """
-    n_estimators, criterion, max_features, bootstrap, max_samples = hyperparameters
-
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4)
-    clf = RandomForestClassifier(n_estimators=n_estimators, criterion=criterion, max_features=max_features,
-                                 bootstrap=bootstrap, max_samples=max_samples)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25)
+    clf = RandomForestClassifier(**hyperparameters)
     clf.fit(X_train, y_train)
     y_preds = clf.predict(X_test)
 
@@ -330,7 +325,6 @@ def RF_classification(X, y, hyperparameters):
 
 
 def print_metrics(y_preds, y_test, classifier_label):
-
     print("Class labels: 'building', 'car', 'fence', 'pole', 'tree'")
     print(classifier_label, "f1:", f1_score(y_test, y_preds, average=None))
     print(classifier_label, "precision:", precision_score(y_test, y_preds, average=None))
@@ -579,18 +573,19 @@ if __name__ == '__main__':
     refined_X = feature_selection(X=X)
 
     # SVM classification
-    #print('\nStart SVM hyperparameter tuning')
-    #h = generate_SVM_hyperparameters(X=refined_X, y=y)
+    print('\nStart SVM hyperparameter tuning')
+    h = generate_SVM_hyperparameters(X=refined_X, y=y)
 
-    #print('\nStart SVM classification')
-    #SVM_classification(X=refined_X, y=y, hyperparameters=h)
+    # Learning curve
+    print('\nStart SVM classification with learning curve')
+    learning_curve(refined_X, y, 100, h, model_type="SVM", runs=50)
+    SVM_classification(X=refined_X, y=y, hyperparameters=h)
 
     # RF classification
     print('\nStart RF hyperparameter tuning')
     h = generate_RF_hyperparameters(X=refined_X, y=y)
 
-    #print('\nStart RF classification')
-    #RF_classification(X=refined_X, y=y, hyperparameters=h)
-
     # Learning curve
+    print('\nStart RF classification with learning curve')
     learning_curve(refined_X, y, 100, h, model_type="RF", runs=50)
+    RF_classification(X=refined_X, y=y, hyperparameters=h)
