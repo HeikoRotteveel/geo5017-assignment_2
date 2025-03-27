@@ -373,7 +373,7 @@ def plot_learning_curve(num_samp_train, mean_train_error_list, mean_test_error_l
 
 
 def learning_curve(X, y, steps, h, model_type='SVM', runs=100):
-    floatlist = np.linspace(0.2, 0.99, steps)  # Ensure values stay between 0 and 1
+    floatlist = np.linspace(0.04, 0.99, steps)  # Ensure values stay between 0 and 1
     mean_train_error_list = []  # Store Apparent Error Rate (AER)
     mean_test_error_list = []   # Store True Error Rate (TER)
     std_train_error_list = []
@@ -578,7 +578,7 @@ if __name__ == '__main__':
 
     # Learning curve
     print('\nStart SVM classification with learning curve')
-    learning_curve(refined_X, y, 20, h, model_type="SVM", runs=50)
+    learning_curve(refined_X, y, 75, h, model_type="SVM", runs=50)
     SVM_classification(X=refined_X, y=y, hyperparameters=h)
 
     # RF classification
@@ -587,5 +587,5 @@ if __name__ == '__main__':
 
     # Learning curve
     print('\nStart RF classification with learning curve')
-    learning_curve(refined_X, y, 20, h, model_type="RF", runs=50)
+    learning_curve(refined_X, y, 75, h, model_type="RF", runs=50)
     RF_classification(X=refined_X, y=y, hyperparameters=h)
